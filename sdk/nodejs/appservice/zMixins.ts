@@ -435,12 +435,12 @@ export interface InputOutputsArgs {
     /**
      * Input bindings.
      */
-    inputs?: InputBindingSettings[];
+    inputs?: pulumi.Input<InputBindingSettings[]>;
 
     /**
      * Output bindings.
      */
-    outputs?: OutputBindingSettings[];
+    outputs?: pulumi.Input<OutputBindingSettings[]>;
 }
 
 /**
@@ -478,9 +478,9 @@ export abstract class Function<C extends Context<R>, E, R extends Result> {
     public readonly appSettings?: pulumi.Input<{ [key: string]: string }>;
 
     constructor(name: string,
-                trigger: pulumi.Input<InputBindingDefinition>,
-                args: CallbackFunctionArgs<C, E, R>,
-                settings?: pulumi.Input<{ [key: string]: string }>) {
+        trigger: pulumi.Input<InputBindingDefinition>,
+        args: CallbackFunctionArgs<C, E, R>,
+        settings?: pulumi.Input<{ [key: string]: string }>) {
         const triggerSettings = { binding: trigger, settings: settings || {} };
         const { bindings, appSettings } = combineBindingSettings(triggerSettings, args.inputs, args.outputs);
         this.name = name;
@@ -511,8 +511,8 @@ export interface ArchiveFunctionAppArgs extends FunctionAppArgsBase {
 };
 
 function createFunctionAppParts(name: string,
-                                args: ArchiveFunctionAppArgs,
-                                opts: pulumi.CustomResourceOptions = {}) {
+    args: ArchiveFunctionAppArgs,
+    opts: pulumi.CustomResourceOptions = {}) {
 
     if (!args.archive) {
         throw new Error("Deployment [archive] must be provided.");
@@ -612,7 +612,7 @@ export class CallbackFunctionApp<C extends Context<R>, E, R extends Result> exte
     public readonly endpoint: pulumi.Output<string>;
 
     constructor(name: string, bindingsOrFunc: pulumi.Input<BindingDefinition[]> | Function<C, E, R>,
-                args: CallbackFunctionAppArgs<C, E, R>, opts: pulumi.CustomResourceOptions = {}) {
+        args: CallbackFunctionAppArgs<C, E, R>, opts: pulumi.CustomResourceOptions = {}) {
 
         const functions = bindingsOrFunc instanceof Function ? [bindingsOrFunc] : [<Function<C, E, R>>{ name, bindings: bindingsOrFunc, callback: args }];
         const parts = createFunctionAppParts(name, {
@@ -667,9 +667,9 @@ export abstract class PackagedFunctionApp extends pulumi.ComponentResource {
     public readonly endpoint: pulumi.Output<string>;
 
     constructor(type: string,
-                name: string,
-                args: ArchiveFunctionAppArgs,
-                opts: pulumi.ComponentResourceOptions = {}) {
+        name: string,
+        args: ArchiveFunctionAppArgs,
+        opts: pulumi.ComponentResourceOptions = {}) {
         super(type, name, undefined, opts);
 
         const parentOpts = { parent: this };
@@ -691,8 +691,8 @@ export abstract class PackagedFunctionApp extends pulumi.ComponentResource {
  */
 export class ArchiveFunctionApp extends PackagedFunctionApp {
     constructor(name: string,
-                args: ArchiveFunctionAppArgs,
-                opts: pulumi.ComponentResourceOptions = {}) {
+        args: ArchiveFunctionAppArgs,
+        opts: pulumi.ComponentResourceOptions = {}) {
         super("azure:appservice:ArchiveFunctionApp", name, args, opts);
         this.registerOutputs();
     }
@@ -707,8 +707,8 @@ export class ArchiveFunctionApp extends PackagedFunctionApp {
  */
 export class MultiCallbackFunctionApp extends PackagedFunctionApp {
     constructor(name: string,
-                args: MultiCallbackFunctionAppArgs,
-                opts: pulumi.ComponentResourceOptions = {}) {
+        args: MultiCallbackFunctionAppArgs,
+        opts: pulumi.ComponentResourceOptions = {}) {
 
         if (args.functions.length == 0) {
             throw new Error("At least one function must be provided.");
@@ -739,9 +739,9 @@ export abstract class EventSubscription<C extends Context<R>, E, R extends Resul
     public readonly functionApp: CallbackFunctionApp<C, E, R>;
 
     constructor(type: string, name: string,
-                bindingsOrFunc: pulumi.Input<BindingDefinition[]> | Function<C, E, R>,
-                args: CallbackFunctionAppArgs<C, E, R>,
-                opts: pulumi.ComponentResourceOptions = {}) {
+        bindingsOrFunc: pulumi.Input<BindingDefinition[]> | Function<C, E, R>,
+        args: CallbackFunctionAppArgs<C, E, R>,
+        opts: pulumi.ComponentResourceOptions = {}) {
         super(type, name, undefined, opts);
 
         this.functionApp = new CallbackFunctionApp(name, bindingsOrFunc, args, { parent: this });
@@ -769,7 +769,7 @@ interface BaseSubscriptionArgs {
 
 /** @internal */
 export function getResourceGroupName(
-        args: BaseSubscriptionArgs, fallbackResourceGroupName: pulumi.Output<string> | undefined) {
+    args: BaseSubscriptionArgs, fallbackResourceGroupName: pulumi.Output<string> | undefined) {
 
     if (args.resourceGroup) {
         return args.resourceGroup.name;
@@ -782,19 +782,21 @@ export function getResourceGroupName(
     return util.ifUndefined(args.resourceGroupName, fallbackResourceGroupName!);
 }
 
-function combineAppSettings(settings: pulumi.Input<{[key: string]: string}>[]): pulumi.Output<{[key: string]: string}> {
+function combineAppSettings(settings: pulumi.Input<{ [key: string]: string }>[]): pulumi.Output<{ [key: string]: string }> {
     return pulumi.all(settings).apply(items => items.reduce((a, b) => ({ ...a, ...b }), {}));
 }
 
 function combineBindingSettings(trigger: BindingSettings<BindingDefinition>,
-                                inputs?: InputBindingSettings[],
-                                outputs?: OutputBindingSettings[]) {
-    const all = [trigger, ...inputs || [], ...outputs || []];
+    inputs?: pulumi.Input<InputBindingSettings[]>,
+    outputs?: pulumi.Input<OutputBindingSettings[]>) {
+    return pulumi.all([inputs, outputs]).apply(([i, o]) => {
+        const all = [trigger, ...i || [], ...o || []];
 
-    const bindings = pulumi.all(all.map(bs => bs.binding));
-    const appSettings = combineAppSettings(all.map(bs => bs.settings));
+        const bindings = pulumi.all(all.map(bs => bs.binding));
+        const appSettings = combineAppSettings(all.map(bs => bs.settings));
 
-    return { bindings, appSettings };
+        return { bindings, appSettings };
+    });
 }
 
 /**

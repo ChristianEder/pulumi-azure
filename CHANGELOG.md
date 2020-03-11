@@ -2,9 +2,7 @@ CHANGELOG
 =========
 
 ## HEAD (Unreleased)
-_(none)_
-
----
+* Allow users to specify their own http output binding for HTTP triggered Azure Functions
 
 ## 2.0.0 (2020-03-10)
 * BREAKING: Upgrade to v2.0.0 of the AzureRM Terraform Provider
